@@ -1,5 +1,5 @@
 ---
-title: "Datos de cantones de Costa Rica - flexdashboard"
+title: "Estadisticas de la criminalidad en el 2021"
 output: 
   flexdashboard::flex_dashboard:
     theme: readable
@@ -85,7 +85,7 @@ colores_cantones_delitos <-
 Row {data-height=10}
 -----------------------------------------------------------------------
 
-### **Fuente de los datos: [Instituto Geográfico Nacional (IGN)](http://geos.snitcr.go.cr/be/IGN_5/wfs)**
+### **Fuente de los datos: [Organimos de Investigación Judiciall (IGN)](https://sitiooij.poder-judicial.go.cr/index.php/ayuda/servicios-policiales/servicios-a-organizaciones/indice-de-transparencia-del-sector-publico-costarricense/datos-abiertos)**
 
 Row {data-height=590}
 -----------------------------------------------------------------------
