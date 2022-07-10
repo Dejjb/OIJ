@@ -6,13 +6,9 @@ output:
     orientation: rows
 ---
 
-```{r setup, include=FALSE}
-library(flexdashboard)
-```
-
 ```{r paquetes}
 # Carga de paquetes
-
+library(flexdashboard)
 library(stringi)
 library(dplyr) # transformación de datos
 library(sf) # manejo de datos vectoriales
@@ -62,7 +58,7 @@ delitos_cr <-
     keep = FALSE
   )
 
-# Conteo de registros por código de provincia
+# Conteo de registros por código de canton
 delitos_x_canton <-
   delitos_cr %>%
   count(cod_canton, name = "delitos")
