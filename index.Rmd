@@ -1,0 +1,248 @@
+---
+title: "Datos de cantones de Costa Rica - flexdashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: readable
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+```{r paquetes}
+# Carga de paquetes
+
+library(stringi)
+library(dplyr) # transformación de datos
+library(sf) # manejo de datos vectoriales
+library(terra) # manejo de datos raster
+library(DT) # tablas interactivas
+library(leaflet) # mapas interactivos
+library(leaflet.extras) # funciones adicionales de leaflet
+library(leafem)
+library(readr)
+library(readxl)
+library(ggplot2)
+library(plotly)
+library(flexdashboard)
+library(readxl)
+library(lubridate)
+
+```
+
+```{r lectura-datos}
+delitos_cr <- 
+  read_xls(path ="C:/Users/Dennis/Desktop/Rtudio/estadisticaspoliciales2021.xls")
+
+cantones <-
+  st_read(dsn = "cantones_simplificados.geojson", quiet = TRUE) %>%
+  st_transform(4326)
+
+cantones <-
+  cantones %>%
+  mutate(canton_normalizado = tolower(stri_trans_general(canton, id = "Latin-ASCII")))
+
+# En el data frame de delitos
+delitos_cr <-
+  delitos_cr %>%
+  mutate(canton_normalizado = tolower(stri_trans_general(Canton, id = "Latin-ASCII")))
+
+# Unión del código de canton a delitos
+delitos_cr <-
+  delitos_cr %>%
+  left_join(
+    dplyr::select(
+      st_drop_geometry(cantones),
+      cod_canton,
+      canton_normalizado
+    ),
+    by = "canton_normalizado",
+    copy = FALSE,
+    keep = FALSE
+  )
+
+# Conteo de registros por código de provincia
+delitos_x_canton <-
+  delitos_cr %>%
+  count(cod_canton, name = "delitos")
+
+# Unión de cantidad de delitos por canton
+cantones_delitos <-
+  cantones %>%
+  left_join(
+    delitos_x_canton,
+    by = "cod_canton",
+    copy = FALSE,
+    keep = FALSE
+  )
+
+colores_cantones_delitos <-
+  colorNumeric(palette = "Reds",
+               domain = cantones_delitos$delitos,
+               na.color = "transparent")
+
+
+```
+
+
+Row {data-height=10}
+-----------------------------------------------------------------------
+
+### **Fuente de los datos: [Instituto Geográfico Nacional (IGN)](http://geos.snitcr.go.cr/be/IGN_5/wfs)**
+
+Row {data-height=590}
+-----------------------------------------------------------------------
+
+### Mapa
+
+```{r}
+# Mapa
+leaflet() %>%
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) %>%
+  addTiles(group = "OpenStreetMap") %>% # capa base
+  addPolygons(
+    # capa de polígonos
+    data = cantones_delitos,
+    fillColor = ~ colores_cantones_delitos(cantones_delitos$delitos),
+    fillOpacity = 0.8,
+    color = "black",
+    stroke = TRUE,
+    weight = 1.0,
+    popup = paste(
+      # ventana emergente
+      paste(
+        "<strong>Canton:</strong>",
+        cantones_delitos$canton
+      ),
+      paste(
+        "<strong>Delitos:</strong>",
+        cantones_delitos$delitos
+      ),
+      sep = '<br/>'
+    ),
+    group = "Delitos en cantones"
+  ) %>%
+  addLayersControl(
+    # control de capas
+    baseGroups = c("OpenStreetMap"),
+    overlayGroups = c("Delitos en cantones")
+  ) %>%
+  addLegend(
+    # leyenda
+    position = "bottomleft",
+    pal = colores_cantones_delitos,
+    values = cantones_delitos$delitos,
+    group = "Delitos",
+    title = "Cantidad de delitos"
+  )
+```
+
+### Tabla
+
+```{r tabla}
+# Tabla
+delitos_cr %>%
+  select(Delito, 
+         Fecha, 
+         Victima,
+         Edad,
+         Genero,
+         Provincia,
+         Canton
+         ) %>%
+  
+  datatable(
+    colnames = c(
+      "Delito", 
+      "Fecha", 
+      "Víctima",
+      "Edad",
+      "Género",
+      "Provincia",
+      "Cantón"
+    ),
+    options = list(
+      pageLength = 10,
+      language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+    ))
+```
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Delitos cometidos en CR
+
+```{r grafico}
+# Gráfico
+ggplot2_delitos_CR <- 
+  delitos_cr %>%
+  count(Delito) %>%
+  ggplot(aes(x = reorder(Delito, n ), y = n)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Cantidad de delitos por delito cometidos en CR") +
+  xlab("Delitos cometidos") +
+  ylab("Cantidad de delitos cometidos") +
+  coord_flip() +
+  theme_minimal()
+ggplotly(ggplot2_delitos_CR) %>% config(locale = 'es')
+```
+
+### Delitos por victima
+```{r graficoss}
+ggplot2_victima_CR <- 
+  delitos_cr %>%
+  count(Victima) %>%
+  ggplot(aes(x = reorder(Victima, n ), y = n)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Cantidad de víctimas por delito") +
+  xlab("Víctimas") +
+  ylab("Cantidad de delitos") +
+  coord_flip() +
+  theme_minimal()
+
+ggplotly(ggplot2_victima_CR) %>% config(locale = 'es')
+```
+
+-----------------------------------------------------------------------
+
+### Delitos por mes
+```{r graficosze}
+## Parte 3 grafico de barras simple que muestra la cantidad
+### de delitos por mes del año
+
+ggplot2_delitos_por_mes <-
+  delitos_cr %>%
+  group_by(Mes = month(ymd(Fecha), label = TRUE)) %>%
+  ggplot(aes (x= Mes)) +
+  geom_bar() +
+  ggtitle("Cantidad de delitos por mes") +
+  xlab("Mes") +
+  ylab("Cantidad de delitos") +
+  coord_flip() +
+  theme_minimal()
+
+ggplotly(ggplot2_delitos_por_mes) %>% config(locale = 'es')
+```
+
+
+### Proporcion de delitos por genero
+```{r graficoszd}
+##### Grafico de barras apilado 4
+delitos_por_genero <-
+  delitos_cr%>%
+  ggplot(aes(x = Delito, fill = Genero)) +
+  geom_bar(position = "fill") +
+  ggtitle("Proporcion de delitos por genero") +
+  xlab("Delitos") +
+  ylab("Proporcion") +
+  labs(fill = "") +
+  coord_flip() +
+  theme_minimal()
+
+ggplotly(delitos_por_genero) %>% config(locale = 'es')
+
+```
